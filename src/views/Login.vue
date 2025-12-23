@@ -1,8 +1,8 @@
 <template>
   <div class="login-container">
     <div class="login-box">
-      <h2>登录</h2>
-      <form @submit.prevent="handleLogin" class="login-form">
+      <h2>{{ isLogin ? '登录' : '注册' }}</h2>
+      <form @submit.prevent="handleSubmit" class="login-form">
         <div class="form-group">
           <label for="email">邮箱</label>
           <input
@@ -21,12 +21,18 @@
             v-model="password"
             required
             placeholder="请输入密码"
+            minlength="6"
           />
         </div>
         <div v-if="error" class="error-message">{{ error }}</div>
         <button type="submit" :disabled="loading" class="login-btn">
-          {{ loading ? '登录中...' : '登录' }}
+          {{ loading ? (isLogin ? '登录中...' : '注册中...') : (isLogin ? '登录' : '注册') }}
         </button>
+        <div class="toggle-form">
+          <button type="button" @click="isLogin = !isLogin" class="toggle-btn">
+            {{ isLogin ? '没有账号？立即注册' : '已有账号？立即登录' }}
+          </button>
+        </div>
       </form>
     </div>
   </div>
@@ -40,17 +46,22 @@ import { useUserStore } from '../stores/user'
 const userStore = useUserStore()
 const router = useRouter()
 
+const isLogin = ref(true)
 const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const error = ref('')
 
-const handleLogin = async () => {
+const handleSubmit = async () => {
   loading.value = true
   error.value = ''
   
   try {
-    await userStore.login(email.value, password.value)
+    if (isLogin.value) {
+      await userStore.login(email.value, password.value)
+    } else {
+      await userStore.register(email.value, password.value)
+    }
     router.push('/dashboard')
   } catch (err) {
     error.value = err.message
@@ -137,5 +148,25 @@ const handleLogin = async () => {
 .login-btn:disabled {
   background-color: #6c757d;
   cursor: not-allowed;
+}
+
+.toggle-form {
+  margin-top: 15px;
+  text-align: center;
+}
+
+.toggle-btn {
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  text-decoration: underline;
+  transition: color 0.3s;
+}
+
+.toggle-btn:hover {
+  color: #0056b3;
 }
 </style>

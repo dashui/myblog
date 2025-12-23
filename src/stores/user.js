@@ -34,6 +34,27 @@ export const useUserStore = defineStore('user', {
       }
     },
     
+    async register(email, password) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password
+        })
+        
+        if (error) throw error
+        this.user = data.user
+        localStorage.setItem('user', JSON.stringify(data.user))
+      } catch (error) {
+        this.error = error.message
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+    
     async logout() {
       this.loading = true
       
