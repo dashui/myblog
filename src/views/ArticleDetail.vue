@@ -234,18 +234,22 @@ const handlePayment = async () => {
       return
     }
     
-    // 在生产环境中，实际调用 Stripe Checkout
-    const { error } = await stripe.redirectToCheckout({
-      sessionId,
-    })
+    // 在生产环境中，使用 Stripe.js 的最新 API 处理支付
+    // 注意：stripe.redirectToCheckout 已被移除，现在使用新的方法
+    console.log('使用最新 Stripe API 处理支付...')
     
-    if (error) {
-      console.error('Stripe Checkout 失败:', error)
-      throw error
+    try {
+      // 方法 1：直接重定向到 Stripe 托管的支付页面
+      // 这是最简单的替代方案，适用于大多数场景
+      const stripeCheckoutUrl = `https://checkout.stripe.com/pay/${sessionId}`
+      console.log('重定向到 Stripe Checkout 页面:', stripeCheckoutUrl)
+      window.location.href = stripeCheckoutUrl
+    } catch (stripeError) {
+      console.error('Stripe 支付处理失败:', stripeError)
+      throw new Error('支付处理失败，请稍后重试')
     }
     
-    // 注意：Stripe 会自动重定向用户，以下代码不会执行
-    // 支付成功后，Stripe 会将用户重定向到 successUrl
+    // 注意：重定向后，以下代码不会执行
     paymentLoading.value = false
   } catch (error) {
     console.error('支付失败:', {
