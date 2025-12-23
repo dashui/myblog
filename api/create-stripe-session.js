@@ -37,6 +37,11 @@ export default async function handler(req, res) {
       mode: 'payment',
       success_url: successUrl,
       cancel_url: cancelUrl,
+      // 添加元数据，用于 webhook 处理
+      metadata: {
+        articleId,
+        userId: req.body.userId, // 从请求中获取用户 ID
+      },
     });
 
     return res.status(200).json({ sessionId: session.id });

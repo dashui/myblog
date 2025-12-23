@@ -155,7 +155,8 @@ const handlePayment = async () => {
         articleId,
         amount,
         successUrl,
-        cancelUrl
+        cancelUrl,
+        userId: userStore.user.id // 传递当前用户 ID
       }),
     })
     
