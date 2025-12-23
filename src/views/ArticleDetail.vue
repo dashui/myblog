@@ -78,30 +78,48 @@ const handlePayment = async () => {
   paymentLoading.value = true
   
   try {
-    // 这里简化处理，实际应调用后端 API 创建支付订单
-    // 这里模拟支付成功，直接解锁
+    // 实际生产环境中，应该调用后端 API 创建支付订单
+    // 这里使用模拟支付流程，部署到 Vercel 后可以替换为真实的支付 API 调用
     
-    // 实际集成 Stripe 代码示例：
-    // const stripe = await stripePromise
-    // const { error } = await stripe.redirectToCheckout({
-    //   lineItems: [
-    //     {
-    //       price: 'price_12345', // 实际应从后端获取
-    //       quantity: 1
-    //     }
-    //   ],
-    //   mode: 'payment',
-    //   successUrl: window.location.href + '?unlocked=true',
-    //   cancelUrl: window.location.href
+    // 1. 调用后端 API 创建支付会话（示例代码）
+    // const response = await fetch('/api/create-payment-session', {
+    //   method: 'POST',
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //   },
+    //   body: JSON.stringify({
+    //     articleId: article.value.id,
+    //     amount: article.value.price,
+    //     successUrl: window.location.href + '?unlocked=true',
+    //     cancelUrl: window.location.href
+    //   }),
     // })
     
-    // 模拟支付成功
+    // const { sessionId } = await response.json()
+    
+    // 2. 使用 Stripe.js 发起支付（示例代码）
+    // const stripe = await stripePromise
+    // const { error } = await stripe.redirectToCheckout({
+    //   sessionId,
+    // })
+    
+    // if (error) {
+    //   throw error
+    // }
+    
+    // 模拟支付成功（仅用于演示，部署到 Vercel 后应替换为真实支付流程）
     setTimeout(() => {
       isUnlocked.value = true
+      // 可以在这里调用 API 更新用户解锁状态
+      // await supabase.from('unlocked_articles').insert([{
+      //   user_id: userStore.user.id,
+      //   article_id: article.value.id
+      // }])
       paymentLoading.value = false
     }, 1000)
   } catch (error) {
     console.error('支付失败:', error)
+    alert('支付失败，请稍后重试')
     paymentLoading.value = false
   }
 }
