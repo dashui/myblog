@@ -45,11 +45,12 @@
 </template>
 
 <script setup>
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { useArticleStore } from '../stores/article'
 import { stripePromise } from '../stripe'
+import { supabase } from '../supabase'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,6 +62,7 @@ const article = computed(() => articleStore.currentArticle)
 const loading = computed(() => articleStore.loading)
 const paymentLoading = ref(false)
 const isUnlocked = ref(false)
+const checkingUnlockedStatus = ref(false)
 
 const articleId = route.params.id
 
@@ -69,57 +71,129 @@ const logout = async () => {
   router.push('/')
 }
 
+// 检查用户是否已经解锁文章
+const checkUnlockedStatus = async () => {
+  if (!isLoggedIn.value || !articleId) {
+    isUnlocked.value = false
+    return
+  }
+  
+  checkingUnlockedStatus.value = true
+  
+  try {
+    const { data, error } = await supabase
+      .from('unlocked_articles')
+      .select('*')
+      .eq('user_id', userStore.user.id)
+      .eq('article_id', articleId)
+      .single()
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // 没有找到记录，说明未解锁
+        isUnlocked.value = false
+      } else {
+        throw error
+      }
+    } else {
+      // 找到记录，说明已解锁
+      isUnlocked.value = true
+    }
+  } catch (error) {
+    console.error('检查解锁状态失败:', error)
+    isUnlocked.value = false
+  } finally {
+    checkingUnlockedStatus.value = false
+  }
+}
+
 const handlePayment = async () => {
   if (!isLoggedIn.value) {
     router.push('/login')
     return
   }
   
+  if (!article.value) {
+    throw new Error('文章不存在')
+  }
+  
   paymentLoading.value = true
   
   try {
-    // 实际生产环境中，应该调用后端 API 创建支付订单
-    // 这里使用模拟支付流程，部署到 Vercel 后可以替换为真实的支付 API 调用
+    // 1. 初始化 Stripe
+    const stripe = await stripePromise
+    if (!stripe) {
+      throw new Error('Stripe 初始化失败')
+    }
     
-    // 1. 调用后端 API 创建支付会话（示例代码）
-    // const response = await fetch('/api/create-payment-session', {
+    // 2. 准备支付参数
+    const articleId = article.value.id
+    const amount = article.value.price
+    const successUrl = `${window.location.origin}${window.location.pathname}?unlocked=true&articleId=${articleId}`
+    const cancelUrl = `${window.location.origin}${window.location.pathname}`
+    
+    // 3. 使用 Stripe Checkout 发起支付
+    // 注意：在生产环境中，应该通过后端 API 创建支付会话，避免在前端暴露价格信息
+    // 这里为了演示，我们使用模拟的会话创建流程
+    
+    // 模拟创建支付会话（实际生产环境中应替换为真实 API 调用）
+    // 由于没有后端 API，我们暂时继续使用模拟支付，但添加更真实的交互
+    console.log('正在发起支付...', {
+      articleId,
+      amount,
+      successUrl,
+      cancelUrl
+    })
+    
+    // 模拟 API 调用延迟
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    // 4. 实际项目中，这里应该调用后端 API 创建 Stripe 会话
+    // 例如：
+    // const response = await fetch('/api/create-stripe-session', {
     //   method: 'POST',
     //   headers: {
     //     'Content-Type': 'application/json',
     //   },
     //   body: JSON.stringify({
-    //     articleId: article.value.id,
-    //     amount: article.value.price,
-    //     successUrl: window.location.href + '?unlocked=true',
-    //     cancelUrl: window.location.href
-    //   }),
+    //     articleId,
+    //     amount,
+    //     successUrl,
+    //     cancelUrl
+    //   })
     // })
-    
     // const { sessionId } = await response.json()
-    
-    // 2. 使用 Stripe.js 发起支付（示例代码）
-    // const stripe = await stripePromise
+    // 
+    // 然后使用 sessionId 发起支付：
     // const { error } = await stripe.redirectToCheckout({
-    //   sessionId,
+    //   sessionId
     // })
-    
+    // 
     // if (error) {
     //   throw error
     // }
     
-    // 模拟支付成功（仅用于演示，部署到 Vercel 后应替换为真实支付流程）
-    setTimeout(() => {
+    // 5. 模拟支付成功（在实际项目中，这部分代码会被 Stripe 重定向替代）
+    setTimeout(async () => {
       isUnlocked.value = true
-      // 可以在这里调用 API 更新用户解锁状态
-      // await supabase.from('unlocked_articles').insert([{
-      //   user_id: userStore.user.id,
-      //   article_id: article.value.id
-      // }])
+      
+      // 6. 记录用户解锁状态到数据库
+      try {
+        await supabase.from('unlocked_articles').insert([{
+          user_id: userStore.user.id,
+          article_id: articleId
+        }])
+        console.log('已记录解锁状态')
+      } catch (dbError) {
+        console.error('记录解锁状态失败:', dbError)
+        // 即使记录失败，也不影响用户阅读
+      }
+      
       paymentLoading.value = false
-    }, 1000)
+    }, 1500)
   } catch (error) {
     console.error('支付失败:', error)
-    alert('支付失败，请稍后重试')
+    alert(`支付失败: ${error.message}`)
     paymentLoading.value = false
   }
 }
@@ -131,6 +205,25 @@ onMounted(async () => {
   // 检查 URL 参数中是否包含解锁信息
   if (route.query.unlocked === 'true') {
     isUnlocked.value = true
+  } else {
+    // 检查用户是否已经解锁该文章
+    await checkUnlockedStatus()
+  }
+})
+
+// 监听用户登录状态变化，重新检查解锁状态
+watch(isLoggedIn, async (newValue) => {
+  if (newValue) {
+    await checkUnlockedStatus()
+  } else {
+    isUnlocked.value = false
+  }
+})
+
+// 监听文章变化，重新检查解锁状态
+watch(article, async (newArticle) => {
+  if (newArticle && isLoggedIn.value) {
+    await checkUnlockedStatus()
   }
 })
 </script>
