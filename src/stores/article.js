@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { supabase } from '../supabase'
+import { useUserStore } from './user'
 
 export const useArticleStore = defineStore('article', {
   state: () => ({
@@ -54,6 +55,14 @@ export const useArticleStore = defineStore('article', {
       this.error = null
       
       try {
+        // 获取用户 store 实例，从中获取当前用户 ID
+        const userStore = useUserStore()
+        const authorId = userStore.user?.id
+        
+        if (!authorId) {
+          throw new Error('用户未登录')
+        }
+        
         const { data, error } = await supabase
           .from('articles')
           .insert([
@@ -62,7 +71,7 @@ export const useArticleStore = defineStore('article', {
               content,
               is_premium: isPremium,
               price,
-              author_id: this.user?.id
+              author_id: authorId
             }
           ])
           .select()
@@ -71,6 +80,7 @@ export const useArticleStore = defineStore('article', {
         this.articles.unshift(data[0])
       } catch (error) {
         this.error = error.message
+        throw error
       } finally {
         this.loading = false
       }

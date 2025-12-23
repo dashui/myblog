@@ -22,6 +22,7 @@
       <div v-if="showCreateForm" class="create-form-container">
         <h3>创建新文章</h3>
         <form @submit.prevent="handleCreateArticle" class="create-form">
+          <div v-if="error" class="error-message">{{ error }}</div>
           <div class="form-group">
             <label for="title">标题</label>
             <input
@@ -99,6 +100,7 @@ const router = useRouter()
 
 const showCreateForm = ref(false)
 const loading = ref(false)
+const error = ref('')
 const newArticle = ref({
   title: '',
   content: '',
@@ -116,6 +118,7 @@ const logout = async () => {
 
 const handleCreateArticle = async () => {
   loading.value = true
+  error.value = ''
   
   try {
     await articleStore.createArticle(
@@ -134,8 +137,9 @@ const handleCreateArticle = async () => {
     }
     
     showCreateForm.value = false
-  } catch (error) {
-    console.error('创建文章失败:', error)
+  } catch (err) {
+    console.error('创建文章失败:', err)
+    error.value = err.message || '创建文章失败，请稍后重试'
   } finally {
     loading.value = false
   }
