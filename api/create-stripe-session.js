@@ -44,7 +44,11 @@ export default async function handler(req, res) {
       },
     });
 
-    return res.status(200).json({ sessionId: session.id });
+    // 返回完整的 checkout URL 和 sessionId
+    return res.status(200).json({ 
+      sessionId: session.id, 
+      checkoutUrl: session.url // 返回 Stripe 生成的完整 URL
+    });
   } catch (error) {
     console.error('Error creating Stripe session:', error);
     return res.status(500).json({ error: error.message });

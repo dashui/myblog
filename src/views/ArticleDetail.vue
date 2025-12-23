@@ -63,6 +63,8 @@ const loading = computed(() => articleStore.loading)
 const paymentLoading = ref(false)
 const isUnlocked = ref(false)
 const checkingUnlockedStatus = ref(false)
+let sessionId = ''
+let checkoutUrl = ''
 
 const articleId = route.params.id
 
@@ -187,7 +189,8 @@ const handlePayment = async () => {
       if (contentType && contentType.includes('application/json')) {
         const data = await response.json()
         sessionId = data.sessionId
-        console.log('支付会话创建成功，sessionId:', sessionId)
+        checkoutUrl = data.checkoutUrl // 获取 Stripe 生成的完整 URL
+        console.log('支付会话创建成功，sessionId:', sessionId, 'checkoutUrl:', checkoutUrl)
       } else {
         const responseText = await response.text()
         console.error('API 响应不是 JSON:', responseText)
@@ -234,16 +237,16 @@ const handlePayment = async () => {
       return
     }
     
-    // 在生产环境中，使用 Stripe.js 的最新 API 处理支付
-    // 注意：stripe.redirectToCheckout 已被移除，现在使用新的方法
-    console.log('使用最新 Stripe API 处理支付...')
+    // 在生产环境中，使用从 API 返回的完整 checkoutUrl
+    console.log('使用 Stripe API 返回的 checkoutUrl 处理支付...')
     
     try {
-      // 方法 1：直接重定向到 Stripe 托管的支付页面
-      // 这是最简单的替代方案，适用于大多数场景
-      const stripeCheckoutUrl = `https://checkout.stripe.com/pay/${sessionId}`
-      console.log('重定向到 Stripe Checkout 页面:', stripeCheckoutUrl)
-      window.location.href = stripeCheckoutUrl
+      if (!checkoutUrl) {
+        throw new Error('缺少 checkoutUrl')
+      }
+      
+      console.log('重定向到 Stripe Checkout 页面:', checkoutUrl)
+      window.location.href = checkoutUrl
     } catch (stripeError) {
       console.error('Stripe 支付处理失败:', stripeError)
       throw new Error('支付处理失败，请稍后重试')
