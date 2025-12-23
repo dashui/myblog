@@ -141,62 +141,46 @@ const handlePayment = async () => {
       cancelUrl
     })
     
-    // 3. 使用 Stripe.js 创建支付元素或发起支付
-    // 由于没有后端 API，我们先使用 Stripe 的测试模式进行演示
-    // 注意：这只是演示 Stripe.js 的调用，实际生产环境必须使用后端创建会话
+    // 3. 调用 Vercel API 路由创建 Stripe 支付会话
+    console.log('调用 Vercel API 创建支付会话...')
     
-    // 测试 Stripe 初始化是否成功
-    console.log('Stripe 对象:', {
-      hasStripe: !!stripe,
-      publishableKey: stripePublishableKey,
-      stripeVersion: stripe.version
+    // 注意：在开发环境中，API 路径是 /api/create-stripe-session
+    // 在生产环境中，会自动使用 Vercel 域名
+    const response = await fetch('/api/create-stripe-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        articleId,
+        amount,
+        successUrl,
+        cancelUrl
+      }),
     })
     
-    // 4. 尝试创建一个简单的支付意图（仅用于测试，实际需要后端支持）
-    try {
-      // 注意：在真实环境中，应该通过后端 API 创建支付意图
-      // 这里我们只是演示 Stripe.js 的调用，不会实际创建支付意图
-      console.log('尝试调用 Stripe API...')
-      
-      // 测试 Stripe 对象的基本功能
-      const elements = stripe.elements()
-      console.log('Stripe Elements 创建成功')
-      
-      // 输出 Stripe 相关日志，证明 Stripe.js 已被正确调用
-      console.log('Stripe 支付流程已启动')
-      console.log('文章信息:', {
-        title: article.value.title,
-        price: amount,
-        isPremium: article.value.is_premium
-      })
-    } catch (stripeTestError) {
-      console.log('Stripe API 测试调用:', {
-        type: 'test_only',
-        message: '这是测试调用，实际生产环境需要后端 API',
-        error: stripeTestError.message
-      })
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || '创建支付会话失败')
     }
     
-    // 5. 模拟支付成功（在实际项目中，这部分代码会被 Stripe 重定向替代）
-    // 注意：在真实环境中，应该通过 Stripe Webhook 来确认支付成功
-    setTimeout(async () => {
-      isUnlocked.value = true
-      
-      // 6. 记录用户解锁状态到数据库
-      try {
-        await supabase.from('unlocked_articles').insert([{
-          user_id: userStore.user.id,
-          article_id: articleId
-        }])
-        console.log('已记录解锁状态到数据库')
-      } catch (dbError) {
-        console.error('记录解锁状态失败:', dbError)
-        // 即使记录失败，也不影响用户阅读
-      }
-      
-      paymentLoading.value = false
-      console.log('支付流程完成，文章已解锁')
-    }, 1000)
+    const { sessionId } = await response.json()
+    console.log('支付会话创建成功，sessionId:', sessionId)
+    
+    // 4. 使用 Stripe.js 发起支付
+    console.log('正在发起 Stripe Checkout...')
+    const { error } = await stripe.redirectToCheckout({
+      sessionId,
+    })
+    
+    if (error) {
+      console.error('Stripe Checkout 失败:', error)
+      throw error
+    }
+    
+    // 注意：Stripe 会自动重定向用户，以下代码不会执行
+    // 支付成功后，Stripe 会将用户重定向到 successUrl
+    paymentLoading.value = false
   } catch (error) {
     console.error('支付失败:', {
       message: error.message,
